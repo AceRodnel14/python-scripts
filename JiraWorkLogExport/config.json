@@ -1,0 +1,10 @@
+{
+    "jira_domain": "CHANGE THIS TO JIRA WEBSITE LIKE https://www.atlassian.com",
+    "email": "CHANGE THIS TO EMAIL THAT HAS API ACCESS",
+    "api_token": "CHANGE THIS TO API TOKEN",
+    "timezone_str": "Asia/Manila",
+    "number_of_holidays": 0,
+    "start_month": "CHANGE THIS TO YYYY-MM-DD LIKE 2026-01-01",
+    "end_month": "CHANGE THIS TO YYYY-MM-DD LIKE 2026-01-31",
+    "csv_file": "generated_2026-01-01_2026-01-31.csv"
+}
