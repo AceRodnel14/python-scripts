@@ -2,13 +2,11 @@ import os
 import re
 import json
 from datetime import datetime
-from textual.app import App, ComposeResult
-from textual.widgets import (
-    Header, Footer, TextArea, Button, Static, ScrollView
-)
-from textual.containers import Vertical
-from textual.reactive import reactive
 
+from textual.app import App, ComposeResult
+from textual.widgets import Header, Footer, TextArea, Button, Static
+from textual.containers import Vertical, VerticalScroll
+from textual.reactive import reactive
 
 cwd = os.getcwd()
 
@@ -29,7 +27,7 @@ def load_external_patterns():
             patterns.append({
                 "regex": re.compile(item["regex"]),
                 "group": item.get("group", 1),
-                "formats": item["formats"]
+                "formats": item["formats"],
             })
 
         return patterns
@@ -46,18 +44,18 @@ builtin_patterns = [
     {
         "regex": re.compile(r'^(.*)=_=(\d{4}-\d{2}-\d{2}T\d{6}(?:\.\d{3})?Z).*'),
         "group": 2,
-        "formats": ["%Y-%m-%dT%H%M%S.%fZ", "%Y-%m-%dT%H%M%SZ"]
+        "formats": ["%Y-%m-%dT%H%M%S.%fZ", "%Y-%m-%dT%H%M%SZ"],
     },
     {
         "regex": re.compile(r'^(.*)__(\d{4}-\d{2}-\d{2}T\d{6}(?:\.\d{3})?Z).*'),
         "group": 2,
-        "formats": ["%Y-%m-%dT%H%M%S.%fZ", "%Y-%m-%dT%H%M%SZ"]
+        "formats": ["%Y-%m-%dT%H%M%S.%fZ", "%Y-%m-%dT%H%M%SZ"],
     },
     {
         "regex": re.compile(r'^(\d{4}-\d{2}-\d{2} \d{2}\.\d{2}\.\d{2}).*'),
         "group": 1,
-        "formats": ["%Y-%m-%d %H.%M.%S"]
-    }
+        "formats": ["%Y-%m-%d %H.%M.%S"],
+    },
 ]
 
 # -----------------------------
@@ -80,7 +78,7 @@ def test_filename(fname, patterns):
                 "green",
                 f"{fname}\n"
                 f"[green]--- matched pattern:[/green] {pat['regex'].pattern}\n"
-                f"[green]--- extracted timestamp:[/green] {ts}\n"
+                f"[green]--- extracted timestamp:[/green] {ts}\n",
             )
 
     # Try fallback 1
@@ -88,12 +86,12 @@ def test_filename(fname, patterns):
     if m1:
         yy, mm, dd = m1.groups()
         try:
-            dt = datetime(int("20" + yy), int(mm), int(dd))
+            datetime(int("20" + yy), int(mm), int(dd))
             return (
                 "yellow",
                 f"{fname}\n"
                 f"[yellow]--- matched fallback: YYMMDD<space>[/yellow]\n"
-                f"[yellow]--- extracted timestamp:[/yellow] 20{yy}-{mm}-{dd}\n"
+                f"[yellow]--- extracted timestamp:[/yellow] 20{yy}-{mm}-{dd}\n",
             )
         except ValueError:
             pass
@@ -103,12 +101,12 @@ def test_filename(fname, patterns):
     if m2:
         yy, mm, dd = m2.groups()
         try:
-            dt = datetime(int("20" + yy), int(mm), int(dd))
+            datetime(int("20" + yy), int(mm), int(dd))
             return (
                 "yellow",
                 f"{fname}\n"
                 f"[yellow]--- matched fallback: YYMMDD-[/yellow]\n"
-                f"[yellow]--- extracted timestamp:[/yellow] 20{yy}-{mm}-{dd}\n"
+                f"[yellow]--- extracted timestamp:[/yellow] 20{yy}-{mm}-{dd}\n",
             )
         except ValueError:
             pass
@@ -117,7 +115,7 @@ def test_filename(fname, patterns):
     return (
         "red",
         f"{fname}\n"
-        f"[red]--- no pattern matched[/red]\n"
+        f"[red]--- no pattern matched[/red]\n",
     )
 
 
@@ -125,43 +123,62 @@ def test_filename(fname, patterns):
 # TUI Application
 # -----------------------------
 class PatternTester(App):
-    CSS_PATH = None
+
+    CSS = """
+    #input_box {
+        height: 10;
+        border: solid green;
+    }
+
+    #scroll_area {
+        height: 20;
+        border: solid blue;
+    }
+    """
+
     TITLE = "Pattern Tester"
     SUB_TITLE = "Test filename patterns with pattern.json support"
 
-    output_text = reactive("")
+    output_text: reactive[str] = reactive("")
 
     def compose(self) -> ComposeResult:
         yield Header()
 
         yield Vertical(
             Static("Enter filenames (one per line):"),
-            TextArea(id="input_box", height=10),
+            TextArea(id="input_box"),
 
             Button("Check Patterns", id="check_btn"),
 
             Static("Results:", id="results_label"),
-            ScrollView(Static("", id="output_box"), id="scroll_area", height=20)
+
+            VerticalScroll(
+                Static("", id="output_box"),
+                id="scroll_area",
+            ),
         )
 
         yield Footer()
 
-    def on_button_pressed(self, event: Button.Pressed):
+    def on_button_pressed(self, event: Button.Pressed) -> None:
         if event.button.id == "check_btn":
             self.run_pattern_check()
 
-    def run_pattern_check(self):
+    def run_pattern_check(self) -> None:
         input_box = self.query_one("#input_box", TextArea)
         output_box = self.query_one("#output_box", Static)
 
-        filenames = [line.strip() for line in input_box.value.split("\n") if line.strip()]
+        # Textual 1.x uses .text, not .value
+        filenames = [
+            line.strip()
+            for line in input_box.text.split("\n")
+            if line.strip()
+        ]
 
-        # Load patterns
         external = load_external_patterns()
         patterns = external if external else builtin_patterns
 
         results = []
-
         for fname in filenames:
             _, text = test_filename(fname, patterns)
             results.append(text)

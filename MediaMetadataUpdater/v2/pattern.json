@@ -1,0 +1,47 @@
+{
+    "patterns": [
+      {
+        "regex": "^(.*)=_=(\\d{4}-\\d{2}-\\d{2}T\\d{6}(?:\\.\\d{3})?Z).*",
+        "group": 2,
+        "formats": [
+          "%Y-%m-%dT%H%M%S.%fZ",
+          "%Y-%m-%dT%H%M%S%Z"
+        ]
+      },
+      {
+        "regex": "^(.*)__(\\d{4}-\\d{2}-\\d{2}T\\d{6}(?:\\.\\d{3})?Z).*",
+        "group": 2,
+        "formats": [
+          "%Y-%m-%dT%H%M%S.%fZ",
+          "%Y-%m-%dT%H%M%S%Z"
+        ]
+      },
+      {
+        "regex": "^(\\d{4}-\\d{2}-\\d{2} \\d{2}\\.\\d{2}\\.\\d{2}).*",
+        "group": 1,
+        "formats": [
+          "%Y-%m-%d %H.%M.%S"
+        ]
+      },
+      {
+        "regex": "^(\\d{6})\\s+.*",
+        "group": 1,
+        "formats": []
+      },
+      {
+        "regex": "^(\\d{6})-.*",
+        "group": 1,
+        "formats": []
+      },
+      {
+        "regex": "^(\\d{6})\\..*",
+        "group": 1,
+        "formats": []
+      },
+      {
+        "regex": "^(\\d{6})_.*",
+        "group": 1,
+        "formats": []
+      }
+    ]
+  }

@@ -5,11 +5,11 @@ import argparse
 from datetime import datetime
 
 from textual.app import App, ComposeResult
-from textual.widgets import Header, Footer, Static, Button, ScrollView
-from textual.containers import Vertical, Horizontal
+from textual.widgets import Header, Footer, Static, Button
+from textual.containers import Vertical, Horizontal, VerticalScroll
+
 
 # Pattern loading
-
 def load_external_patterns(cwd: str):
     json_path = os.path.join(cwd, "pattern.json")
     if not os.path.isfile(json_path):
@@ -24,7 +24,7 @@ def load_external_patterns(cwd: str):
             patterns.append({
                 "regex": re.compile(item["regex"]),
                 "group": item.get("group", 1),
-                "formats": item["formats"]
+                "formats": item["formats"],
             })
 
         return patterns
@@ -34,47 +34,42 @@ def load_external_patterns(cwd: str):
         return None
 
 
-# Built-in main patterns (used if pattern.json is missing)
+# Built-in main patterns
 BUILTIN_PATTERNS = [
     {
         "regex": re.compile(r'^(.*)=_=(\d{4}-\d{2}-\d{2}T\d{6}(?:\.\d{3})?Z).*'),
         "group": 2,
-        "formats": ["%Y-%m-%dT%H%M%S.%fZ", "%Y-%m-%dT%H%M%SZ"]
+        "formats": ["%Y-%m-%dT%H%M%S.%fZ", "%Y-%m-%dT%H%M%SZ"],
     },
     {
         "regex": re.compile(r'^(.*)__(\d{4}-\d{2}-\d{2}T\d{6}(?:\.\d{3})?Z).*'),
         "group": 2,
-        "formats": ["%Y-%m-%dT%H%M%S.%fZ", "%Y-%m-%dT%H%M%SZ"]
+        "formats": ["%Y-%m-%dT%H%M%S.%fZ", "%Y-%m-%dT%H%M%SZ"],
     },
     {
         "regex": re.compile(r'^(\d{4}-\d{2}-\d{2} \d{2}\.\d{2}\.\d{2}).*'),
         "group": 1,
-        "formats": ["%Y-%m-%d %H.%M.%S"]
-    }
+        "formats": ["%Y-%m-%d %H.%M.%S"],
+    },
 ]
 
-# Built-in fallback patterns
+# Fallback patterns
 FALLBACK_SPACE = re.compile(r'^(\d{2})(\d{2})(\d{2})\s+.*')
 FALLBACK_DASH = re.compile(r'^(\d{2})(\d{2})(\d{2})-.*')
 
 
 # Pattern matching logic
-
 def classify_filename(fname: str, patterns):
-    """Return (kind, info_dict) where kind is 'main', 'fallback', or 'none'."""
-    # Try main patterns
     for pat in patterns:
         m = pat["regex"].match(fname)
         if m:
             ts = m.group(pat["group"])
-            # We don't care if parsing fails here for the browser; just show the raw timestamp
             return "main", {
                 "filename": fname,
                 "pattern": pat["regex"].pattern,
                 "timestamp": ts,
             }
 
-    # Try fallback 1
     m1 = FALLBACK_SPACE.match(fname)
     if m1:
         yy, mm, dd = m1.groups()
@@ -89,7 +84,6 @@ def classify_filename(fname: str, patterns):
         except ValueError:
             pass
 
-    # Try fallback 2
     m2 = FALLBACK_DASH.match(fname)
     if m2:
         yy, mm, dd = m2.groups()
@@ -104,7 +98,6 @@ def classify_filename(fname: str, patterns):
         except ValueError:
             pass
 
-    # No match
     return "none", {
         "filename": fname,
         "pattern": None,
@@ -113,20 +106,35 @@ def classify_filename(fname: str, patterns):
 
 
 # Arg parsing
-
 def parse_args():
     parser = argparse.ArgumentParser(description="Pattern Browser (read-only, non-recursive)")
     parser.add_argument(
         "--dir",
         required=True,
-        help="Comma-separated list of directories to scan (non-recursive)"
+        help="Comma-separated list of directories to scan (non-recursive)",
     )
     return parser.parse_args()
 
 
 # Textual App
-
 class PatternBrowser(App):
+
+    CSS = """
+    #scroll_area {
+        height: 25;
+        border: solid green;
+    }
+
+    #summary_box {
+        padding: 1;
+        border: solid blue;
+    }
+
+    #output_box {
+        padding: 1;
+    }
+    """
+
     TITLE = "Pattern Browser"
     SUB_TITLE = "Pattern.json + built-in patterns (read-only)"
 
@@ -140,21 +148,25 @@ class PatternBrowser(App):
 
         yield Vertical(
             Static("", id="summary_box"),
+
             Horizontal(
                 Button("Show matched files", id="btn_matched"),
                 Button("Show not matched files", id="btn_notmatched"),
-                id="buttons_row"
+                id="buttons_row",
             ),
-            ScrollView(Static("", id="output_box"), id="scroll_area"),
+
+            VerticalScroll(
+                Static("", id="output_box"),
+                id="scroll_area",
+            ),
         )
 
         yield Footer()
 
-    def on_mount(self):
-        # Set summary text
+    def on_mount(self) -> None:
         summary_box = self.query_one("#summary_box", Static)
         s = self.summary
-        summary_text = (
+        summary_box.update(
             f"[b]Pattern Browser Summary[/b]\n"
             f"Total files: {s['total']}\n"
             f"Matched (main + fallback): {s['matched_total']}\n"
@@ -162,9 +174,8 @@ class PatternBrowser(App):
             f"  - Fallback matches: {s['fallback']}\n"
             f"Not matched: {s['none']}\n"
         )
-        summary_box.update(summary_text)
 
-    def on_button_pressed(self, event: Button.Pressed):
+    def on_button_pressed(self, event: Button.Pressed) -> None:
         output_box = self.query_one("#output_box", Static)
 
         if event.button.id == "btn_matched":
@@ -195,19 +206,15 @@ class PatternBrowser(App):
 
 
 # Main entry
-
 def main():
     args = parse_args()
     cwd = os.getcwd()
 
-    # Directories to scan (non-recursive)
     folder_list = [os.path.abspath(p.strip()) for p in args.dir.split(",") if p.strip()]
 
-    # Load patterns
     external = load_external_patterns(cwd)
     patterns = external if external else BUILTIN_PATTERNS
 
-    # Scan files (non-recursive)
     results = []
     main_count = 0
     fallback_count = 0
