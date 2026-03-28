@@ -4,7 +4,7 @@ import json
 from datetime import datetime
 
 from textual.app import App, ComposeResult
-from textual.widgets import Header, Footer, TextArea, Button, Static
+from textual.widgets import Header, Footer, TextArea, Button, Static, RichLog
 from textual.containers import Vertical, VerticalScroll
 from textual.reactive import reactive
 
@@ -131,8 +131,12 @@ class PatternTester(App):
     }
 
     #scroll_area {
-        height: 20;
+        height: 1fr;
         border: solid blue;
+    }
+
+    #output_box {
+        padding: 1;
     }
     """
 
@@ -153,7 +157,7 @@ class PatternTester(App):
             Static("Results:", id="results_label"),
 
             VerticalScroll(
-                Static("", id="output_box"),
+                RichLog(id="output_box", markup=True, wrap=False),
                 id="scroll_area",
             ),
         )
@@ -166,9 +170,8 @@ class PatternTester(App):
 
     def run_pattern_check(self) -> None:
         input_box = self.query_one("#input_box", TextArea)
-        output_box = self.query_one("#output_box", Static)
+        output_box = self.query_one("#output_box", RichLog)
 
-        # Textual 1.x uses .text, not .value
         filenames = [
             line.strip()
             for line in input_box.text.split("\n")
@@ -178,12 +181,11 @@ class PatternTester(App):
         external = load_external_patterns()
         patterns = external if external else builtin_patterns
 
-        results = []
+        output_box.clear()
+
         for fname in filenames:
             _, text = test_filename(fname, patterns)
-            results.append(text)
-
-        output_box.update("\n".join(results))
+            output_box.write(text)
 
 
 if __name__ == "__main__":

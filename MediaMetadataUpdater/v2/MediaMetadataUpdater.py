@@ -8,7 +8,7 @@ import json
 from datetime import datetime
 from concurrent.futures import ProcessPoolExecutor, as_completed
 
-# Default folders (can be overridden by --directory)
+# Default folders (can be overridden by --dir)
 folders = r"/data"
 
 cwd = os.getcwd()
@@ -91,7 +91,7 @@ def parse_args():
     )
 
     parser.add_argument(
-        "--directory",
+        "--dir",
         help="Comma-separated list of directories to scan (overrides default folders)"
     )
 
@@ -253,10 +253,10 @@ def main():
     print(f"Using {workers} worker processes out of {total_threads} available threads.")
 
     # Determine directories
-    if args.directory:
-        folder_list = [os.path.abspath(p.strip()) for p in args.directory.split(",") if p.strip()]
+    if args.dir:
+        folder_list = [os.path.abspath(p.strip()) for p in args.dir.split(",") if p.strip()]
         if verbose:
-            print(f"Using directories from --directory: {folder_list}")
+            print(f"Using directories from --dir: {folder_list}")
     else:
         folder_list = [f.strip() for f in folders.split(",") if f.strip()]
         if verbose:

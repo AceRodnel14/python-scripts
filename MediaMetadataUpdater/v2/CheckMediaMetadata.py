@@ -5,7 +5,7 @@ import argparse
 from datetime import datetime
 
 from textual.app import App, ComposeResult
-from textual.widgets import Header, Footer, Static, Button
+from textual.widgets import Header, Footer, Static, Button, RichLog
 from textual.containers import Vertical, Horizontal, VerticalScroll
 
 
@@ -51,6 +51,11 @@ BUILTIN_PATTERNS = [
         "group": 1,
         "formats": ["%Y-%m-%d %H.%M.%S"],
     },
+    {
+        "regex": "^(\\d{2})(\\d{2})(\\d{2})\\.(.+)$",
+        "group": 1,
+        "formats": ["%y%m%d"],
+    }
 ]
 
 # Fallback patterns
@@ -121,8 +126,8 @@ class PatternBrowser(App):
 
     CSS = """
     #scroll_area {
-        height: 25;
         border: solid green;
+        height: 1fr;
     }
 
     #summary_box {
@@ -156,7 +161,7 @@ class PatternBrowser(App):
             ),
 
             VerticalScroll(
-                Static("", id="output_box"),
+                RichLog(id="output_box", markup=True, wrap=False),
                 id="scroll_area",
             ),
         )
@@ -176,33 +181,34 @@ class PatternBrowser(App):
         )
 
     def on_button_pressed(self, event: Button.Pressed) -> None:
-        output_box = self.query_one("#output_box", Static)
+        output_box = self.query_one("#output_box", RichLog)
+        output_box.clear()
 
         if event.button.id == "btn_matched":
-            lines = []
+            found = False
             for item in self.results:
                 if item["kind"] in ("main", "fallback"):
+                    found = True
                     color = "green" if item["kind"] == "main" else "yellow"
-                    lines.append(
+                    output_box.write(
                         f"[{color}]{item['filename']}[/{color}]\n"
                         f"[{color}]--- matched pattern:[/{color}] {item['pattern']}\n"
                         f"[{color}]--- extracted timestamp:[/{color}] {item['timestamp']}\n"
                     )
-            if not lines:
-                lines = ["[yellow]No matched files.[/yellow]\n"]
-            output_box.update("\n".join(lines))
+            if not found:
+                output_box.write("[yellow]No matched files.[/yellow]\n")
 
         elif event.button.id == "btn_notmatched":
-            lines = []
+            found = False
             for item in self.results:
                 if item["kind"] == "none":
-                    lines.append(
+                    found = True
+                    output_box.write(
                         f"[red]{item['filename']}[/red]\n"
                         f"[red]--- no pattern matched[/red]\n"
                     )
-            if not lines:
-                lines = ["[green]All files matched some pattern.[/green]\n"]
-            output_box.update("\n".join(lines))
+            if not found:
+                output_box.write("[green]All files matched some pattern.[/green]\n")
 
 
 # Main entry
