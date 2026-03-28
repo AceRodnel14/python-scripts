@@ -2,9 +2,8 @@ import os
 import sys
 
 from textual.app import App, ComposeResult
-from textual.widgets import Header, Footer, RichLog, Static
-from textual.containers import Horizontal, Vertical, VerticalScroll
-from textual.events import Scroll
+from textual.widgets import Header, Footer, DataTable, Static
+from textual.containers import Vertical
 
 
 def list_files(folder: str):
@@ -17,23 +16,18 @@ def list_files(folder: str):
 
 
 def merge_lists(left, right):
-    """Return sorted union of filenames."""
     return sorted(set(left) | set(right))
 
 
 class DirCompare(App):
 
     CSS = """
-    #left_area, #right_area {
+    #table {
         height: 1fr;
         border: solid green;
     }
 
-    #left_log, #right_log {
-        padding: 1;
-    }
-
-    #title_left, #title_right {
+    #title {
         padding: 1;
         text-style: bold;
     }
@@ -54,54 +48,28 @@ class DirCompare(App):
     def compose(self) -> ComposeResult:
         yield Header()
 
-        yield Horizontal(
-
-            Vertical(
-                Static(f"Folder 1:\n{self.folder1}", id="title_left"),
-                VerticalScroll(
-                    RichLog(id="left_log", markup=True, wrap=False),
-                    id="left_area",
-                ),
-            ),
-
-            Vertical(
-                Static(f"Folder 2:\n{self.folder2}", id="title_right"),
-                VerticalScroll(
-                    RichLog(id="right_log", markup=True, wrap=False),
-                    id="right_area",
-                ),
-            ),
+        yield Vertical(
+            Static(f"Folder 1: {self.folder1}\nFolder 2: {self.folder2}", id="title"),
+            DataTable(id="table"),
         )
 
         yield Footer()
 
     def on_mount(self):
-        left_log = self.query_one("#left_log", RichLog)
-        right_log = self.query_one("#right_log", RichLog)
+        table = self.query_one("#table", DataTable)
+
+        table.add_column("Folder 1", width=40)
+        table.add_column("Folder 2", width=40)
 
         for name in self.merged:
-            left_exists = name in self.left_files
-            right_exists = name in self.right_files
+            left = name if name in self.left_files else ""
+            right = name if name in self.right_files else ""
+            table.add_row(left, right)
 
-            if left_exists:
-                left_log.write(f"[green]{name}[/green]")
-            else:
-                left_log.write("")
-
-            if right_exists:
-                right_log.write(f"[green]{name}[/green]")
-            else:
-                right_log.write("")
-
-    def on_scroll(self, event: Scroll) -> None:
-        """Sync vertical scrolling between left and right panels."""
-        left = self.query_one("#left_area", VerticalScroll)
-        right = self.query_one("#right_area", VerticalScroll)
-
-        if event.sender.id == "left_area":
-            right.scroll_y = left.scroll_y
-        elif event.sender.id == "right_area":
-            left.scroll_y = right.scroll_y
+        table.cursor_type = "row"
+        table.show_cursor = False
+        table.show_header = True
+        table.zebra_stripes = True
 
 
 def main():
