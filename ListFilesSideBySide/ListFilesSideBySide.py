@@ -4,6 +4,7 @@ import sys
 from textual.app import App, ComposeResult
 from textual.widgets import Header, Footer, RichLog, Static
 from textual.containers import Horizontal, Vertical, VerticalScroll
+from textual.events import Scroll
 
 
 def list_files(folder: str):
@@ -91,6 +92,16 @@ class DirCompare(App):
                 right_log.write(f"[green]{name}[/green]")
             else:
                 right_log.write("")
+
+    def on_scroll(self, event: Scroll) -> None:
+        """Sync vertical scrolling between left and right panels."""
+        left = self.query_one("#left_area", VerticalScroll)
+        right = self.query_one("#right_area", VerticalScroll)
+
+        if event.sender.id == "left_area":
+            right.scroll_y = left.scroll_y
+        elif event.sender.id == "right_area":
+            left.scroll_y = right.scroll_y
 
 
 def main():
