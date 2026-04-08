@@ -1,8 +1,9 @@
 import os
 import argparse
-import requests
+import json
 import re
 from pathlib import Path
+from urllib.request import urlopen, Request
 
 # ---------------------------------------
 # ANSI COLORS
@@ -52,15 +53,17 @@ def clean_existing_dirs(base_dir: Path, dry_run: bool):
             print(f"{CYAN}Non-empty folder kept:{RESET} {folder} ({len(contents)} item(s))")
 
 # ---------------------------------------
-# FETCH ALBUM LIST FROM HTTP ENDPOINT
+# FETCH ALBUM LIST (NO requests module)
 # ---------------------------------------
 def fetch_album_list(url: str):
     print("\n[STEP] Sending HTTP request...")
-    response = requests.get(url, timeout=10)
-    response.raise_for_status()
+
+    req = Request(url, headers={"User-Agent": "Python-urllib"})
+    with urlopen(req, timeout=10) as response:
+        raw = response.read().decode("utf-8")
 
     print("[STEP] Parsing JSON response...")
-    data = response.json()
+    data = json.loads(raw)
 
     if not isinstance(data, list):
         raise ValueError("Expected JSON array at top level")
