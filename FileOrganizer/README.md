@@ -53,3 +53,15 @@ This script is the reverse of categorizeFiles.py. This checks the subdirectories
 | ----------- | ----------- |
 | --dir \"path\" | This specifies the directory |
 | --dry-run | Add this to get a preview of what might happen.<br/>No changes will be made when this is added |
+
+## deleteEmptySubdirs.py
+This is a cleanup script. This will delete empty subdirectories so that the directory is a little bit cleaner
+### Usage
+1. CD to the directory and run the script using the command below<br/>
+`python deleteEmptySubdirs.py --dir PATH`<br/>
+`python deleteEmptySubdirs.py --dir PATH --dry-run`<br/>
+### Additional parameters/ arguments
+| | Description |
+| ----------- | ----------- |
+| --dir \"path\" | This specifies the directory |
+| --dry-run | Add this to get a preview of what might happen.<br/>No changes will be made when this is added |
