@@ -86,11 +86,18 @@ def process_path(path, changed_dir, processed_dir):
 def main():
     global total_scanned, changed_to_webp, not_changed
 
-    if len(sys.argv) < 2:
-        print("Usage: python script.py <path1,path2,path3>")
+    if "--dir" not in sys.argv:
+        print("Usage: python script.py --dir <path1,path2,path3>")
         sys.exit(1)
 
-    input_paths = sys.argv[1]
+    # Get the value after --dir
+    try:
+        dir_index = sys.argv.index("--dir") + 1
+        input_paths = sys.argv[dir_index]
+    except (ValueError, IndexError):
+        print("Error: --dir flag provided but no directory list found.")
+        sys.exit(1)
+
     paths = [os.path.abspath(p.strip()) for p in input_paths.split(",")]
 
     # Create folders where the script is executed
