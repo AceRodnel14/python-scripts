@@ -7,15 +7,12 @@ Deterministic, audit-friendly, non-destructive
 """
 
 import argparse
-import os
-import time
 from datetime import datetime
 from pathlib import Path
 
 from textual.app import App, ComposeResult
 from textual.widgets import DataTable, Footer, Header, Static
 from textual.reactive import reactive
-from textual import events
 
 
 # --- Utility functions ---
@@ -42,19 +39,15 @@ def iter_files(base_dir: Path, max_depth: int):
 
 def get_file_info(path: Path, sort_mode: str):
     """
-    Return (name, timestamp_str, timestamp_raw)
+    Return (full_path_str, timestamp_str, timestamp_raw)
     """
     stat = path.stat()
 
-    if sort_mode == "modified":
-        ts = stat.st_mtime
-    else:
-        ts = stat.st_ctime
-
+    ts = stat.st_mtime if sort_mode == "modified" else stat.st_ctime
     dt = datetime.fromtimestamp(ts)
     ts_str = dt.strftime("%Y-%m-%d %H:%M:%S")
 
-    return path.name, ts_str, ts
+    return str(path), ts_str, ts
 
 
 # --- TUI Application ---
@@ -84,7 +77,7 @@ class FileListerApp(App):
     def on_mount(self):
         table = self.query_one("#table", DataTable)
 
-        table.add_column("Name", key="name", width=None)
+        table.add_column("Path", key="path", width=None)
         table.add_column("Timestamp", key="timestamp", width=19)  # fixed width
 
         for row in self.file_rows:
@@ -145,10 +138,7 @@ def main():
         return
 
     # Determine sort mode
-    if args.modified:
-        sort_mode = "modified"
-    else:
-        sort_mode = "creation"
+    sort_mode = "modified" if args.modified else "creation"
 
     print(f"Scanning: {base_dir}")
     print(f"Recursion depth: {args.n}")
@@ -163,8 +153,8 @@ def main():
         if count % 50 == 0:
             print(f"Processing... {count} files", end="\r")
 
-        name, ts_str, ts_raw = get_file_info(file_path, sort_mode)
-        rows.append((name, ts_str, ts_raw))
+        full_path, ts_str, ts_raw = get_file_info(file_path, sort_mode)
+        rows.append((full_path, ts_str, ts_raw))
 
     print(f"\nTotal files: {count}")
 
