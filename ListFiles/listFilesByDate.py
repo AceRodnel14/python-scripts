@@ -20,6 +20,9 @@ from textual.reactive import reactive
 def iter_files(base_dir: Path, max_depth: int):
     """
     Recursively yield files up to max_depth.
+    max_depth = 0  -> only base_dir
+    max_depth = 1  -> base_dir + 1 level down
+    etc.
     """
     stack = [(base_dir, 0)]
     while stack:
@@ -34,19 +37,19 @@ def iter_files(base_dir: Path, max_depth: int):
                 elif entry.is_dir():
                     stack.append((entry, depth + 1))
         except PermissionError:
+            # Skip directories we can't access
             continue
 
 
 def get_file_info(path: Path, sort_mode: str):
     """
     Return (full_path_str, timestamp_str, timestamp_raw)
+    sort_mode: "creation" or "modified"
     """
     stat = path.stat()
-
     ts = stat.st_mtime if sort_mode == "modified" else stat.st_ctime
     dt = datetime.fromtimestamp(ts)
     ts_str = dt.strftime("%Y-%m-%d %H:%M:%S")
-
     return str(path), ts_str, ts
 
 
@@ -77,8 +80,11 @@ class FileListerApp(App):
     def on_mount(self):
         table = self.query_one("#table", DataTable)
 
-        table.add_column("Path", key="path", width=None)
-        table.add_column("Timestamp", key="timestamp", width=19)  # fixed width
+        # Path column: shrinkable, can be truncated
+        table.add_column("Path", key="path", width=1, ratio=1)
+
+        # Timestamp column: fixed width, always visible on the right
+        table.add_column("Timestamp", key="timestamp", width=19)
 
         for row in self.file_rows:
             table.add_row(row[0], row[1])
@@ -98,6 +104,7 @@ class FileListerApp(App):
         if table.row_count > 0:
             table.move_cursor(row=table.row_count - 1)
 
+
 # --- CLI + Main ---
 
 def main():
@@ -115,13 +122,13 @@ def main():
         "-n",
         type=int,
         default=1,
-        help="Recursion depth (default: 1)."
+        help="Recursion depth (1 = current folder only; default: 1)."
     )
 
     parser.add_argument(
         "--creation",
         action="store_true",
-        help="Sort by creation date (oldest → newest)."
+        help="Sort by creation date (oldest → newest). Default if --modified is not set."
     )
 
     parser.add_argument(
@@ -148,7 +155,10 @@ def main():
     rows = []
     count = 0
 
-    for file_path in iter_files(base_dir, args.n - 1):
+    # n = 1 -> max_depth = 0 (only current folder)
+    max_depth = max(args.n - 1, 0)
+
+    for file_path in iter_files(base_dir, max_depth):
         count += 1
         if count % 50 == 0:
             print(f"Processing... {count} files", end="\r")
@@ -161,8 +171,10 @@ def main():
     # Sort oldest → newest
     rows.sort(key=lambda x: x[2])
 
-    # Launch TUI
-    app = FileListerApp(rows, sort_mode)
+    # Strip the raw timestamp before passing to TUI
+    display_rows = [(r[0], r[1]) for r in rows]
+
+    app = FileListerApp(display_rows, sort_mode)
     app.run()
 
 
