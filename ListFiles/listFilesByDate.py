@@ -18,12 +18,6 @@ from textual.reactive import reactive
 # --- Utility functions ---
 
 def iter_files(base_dir: Path, max_depth: int):
-    """
-    Recursively yield files up to max_depth.
-    max_depth = 0  -> only base_dir
-    max_depth = 1  -> base_dir + 1 level down
-    etc.
-    """
     stack = [(base_dir, 0)]
     while stack:
         current, depth = stack.pop()
@@ -37,7 +31,6 @@ def iter_files(base_dir: Path, max_depth: int):
                 elif entry.is_dir():
                     stack.append((entry, depth + 1))
         except PermissionError:
-            # Skip directories we can't access
             continue
 
 
@@ -47,23 +40,48 @@ def get_file_info(path: Path, sort_mode: str):
     sort_mode: "creation" or "modified"
     """
     stat = path.stat()
-    ts = stat.st_mtime if sort_mode == "modified" else stat.st_ctime
+
+    # --------------------------------------------------------
+    # Birth time (true creation time)
+    # --------------------------------------------------------
+    try:
+        birth_ts = stat.st_birthtime
+    except AttributeError:
+        # Filesystem does not support birth time → fallback to mtime
+        birth_ts = stat.st_mtime
+
+    # --------------------------------------------------------
+    # Modified time
+    # --------------------------------------------------------
+    modify_ts = stat.st_mtime
+
+    # --------------------------------------------------------
+    # Choose timestamp based on sort mode
+    # --------------------------------------------------------
+    ts = birth_ts if sort_mode == "creation" else modify_ts
+
     dt = datetime.fromtimestamp(ts)
     ts_str = dt.strftime("%Y-%m-%d %H:%M:%S")
+
     return str(path), ts_str, ts
 
 
-# --- TUI Application ---
+# ------------------------------------------------------------
+# TUI Application
+# ------------------------------------------------------------
 
 class FileListerApp(App):
     CSS_PATH = None
 
     sort_mode = reactive("creation")
     file_rows = reactive([])
+    path_width = reactive(40)   # default width
 
     BINDINGS = [
         ("^", "jump_top", "Jump to top"),
         ("V", "jump_bottom", "Jump to bottom"),
+        ("[", "shrink_path", "Shrink path column"),
+        ("]", "expand_path", "Expand path column"),
     ]
 
     def __init__(self, rows, sort_mode):
@@ -78,12 +96,20 @@ class FileListerApp(App):
         yield Footer()
 
     def on_mount(self):
+        self.build_table()
+
+    # --------------------------------------------------------
+    # Table builder (rebuilds when width changes)
+    # --------------------------------------------------------
+
+    def build_table(self):
         table = self.query_one("#table", DataTable)
+        table.clear(columns=True)
 
-        # Path column: shrinkable, can be truncated
-        table.add_column("Path", key="path", width=1, ratio=1)
+        # Path column: manually sized
+        table.add_column("Path", key="path", width=self.path_width)
 
-        # Timestamp column: fixed width, always visible on the right
+        # Timestamp column: fixed width
         table.add_column("Timestamp", key="timestamp", width=19)
 
         for row in self.file_rows:
@@ -92,7 +118,9 @@ class FileListerApp(App):
         table.cursor_type = "row"
         table.focus()
 
-    # --- Key bindings ---
+    # --------------------------------------------------------
+    # Key bindings
+    # --------------------------------------------------------
 
     def action_jump_top(self):
         table = self.query_one("#table", DataTable)
@@ -104,38 +132,31 @@ class FileListerApp(App):
         if table.row_count > 0:
             table.move_cursor(row=table.row_count - 1)
 
+    def action_shrink_path(self):
+        self.path_width = max(10, self.path_width - 5)
+        self.build_table()
 
-# --- CLI + Main ---
+    def action_expand_path(self):
+        self.path_width = min(500, self.path_width + 5)
+        self.build_table()
+
+
+# ------------------------------------------------------------
+# CLI + Main
+# ------------------------------------------------------------
 
 def main():
     parser = argparse.ArgumentParser(
         description="List files recursively and display in a Textual TUI table."
     )
 
-    parser.add_argument(
-        "--dir",
-        required=True,
-        help="Directory to scan."
-    )
-
-    parser.add_argument(
-        "-n",
-        type=int,
-        default=1,
-        help="Recursion depth (1 = current folder only; default: 1)."
-    )
-
-    parser.add_argument(
-        "--creation",
-        action="store_true",
-        help="Sort by creation date (oldest → newest). Default if --modified is not set."
-    )
-
-    parser.add_argument(
-        "--modified",
-        action="store_true",
-        help="Sort by modified date (oldest → newest)."
-    )
+    parser.add_argument("--dir", required=True, help="Directory to scan.")
+    parser.add_argument("-n", type=int, default=1,
+                        help="Recursion depth (1 = current folder only).")
+    parser.add_argument("--creation", action="store_true",
+                        help="Sort by creation date (default).")
+    parser.add_argument("--modified", action="store_true",
+                        help="Sort by modified date.")
 
     args = parser.parse_args()
 
@@ -144,7 +165,6 @@ def main():
         print(f"Directory does not exist: {base_dir}")
         return
 
-    # Determine sort mode
     sort_mode = "modified" if args.modified else "creation"
 
     print(f"Scanning: {base_dir}")
@@ -154,8 +174,6 @@ def main():
 
     rows = []
     count = 0
-
-    # n = 1 -> max_depth = 0 (only current folder)
     max_depth = max(args.n - 1, 0)
 
     for file_path in iter_files(base_dir, max_depth):
@@ -168,10 +186,7 @@ def main():
 
     print(f"\nTotal files: {count}")
 
-    # Sort oldest → newest
     rows.sort(key=lambda x: x[2])
-
-    # Strip the raw timestamp before passing to TUI
     display_rows = [(r[0], r[1]) for r in rows]
 
     app = FileListerApp(display_rows, sort_mode)
