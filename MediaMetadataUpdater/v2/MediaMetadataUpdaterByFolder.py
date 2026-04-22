@@ -45,10 +45,9 @@ def update_timestamp(file_path, dt_string):
         "exiftool",
         "-overwrite_original",
         f"-DateTimeOriginal={dt_string}",
-        f"-CreateDate={dt_string}",
+        f"-AllDates={dt_string}",
+        f"-CreationTime={dt_string}",
         f"-ModifyDate={dt_string}",
-        f"-TrackCreateDate={dt_string}",
-        f"-TrackModifyDate={dt_string}",
         file_path
     ], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
 
